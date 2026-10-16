@@ -1,0 +1,230 @@
+{
+  "name": "Automated PDF Invoice Parser",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_DRIVE_FOLDER_ID",
+          "mode": "url"
+        },
+        "event": "fileCreated",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        -304,
+        0
+      ],
+      "id": "be8de403-e122-4302-9c8d-713299ff5ce1",
+      "name": "Google Drive Trigger",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "v6yXw1ZXPR9nsddh",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -48,
+        0
+      ],
+      "id": "b72e5438-b303-4453-84bd-57254b94cf79",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "v6yXw1ZXPR9nsddh",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        192,
+        0
+      ],
+      "id": "f990a7c0-60fd-4080-a36b-8750922ab41e",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $input.first().json.text;\n\nconst invoiceMatch = rawText.match(/#\\s*([0-9]+)/i);\nconst clientMatch = rawText.match(/Bill To:\\s*([A-Za-z\\s]+?)(?=\\s+[A-Za-z]{3}\\s+\\d{2},\\s+\\d{4})/i);\nconst dateMatch = rawText.match(/([A-Za-z]{3}\\s+\\d{2},\\s+\\d{4})/i);\nconst totalMatch = rawText.match(/(US\\$[0-9]+\\.[0-9]{2})/i);\n\nreturn {\n  json: {\n    invoiceNumber: invoiceMatch ? invoiceMatch[1].trim() : \"\",\n    client: clientMatch ? clientMatch[1].trim() : \"\",\n    date: dateMatch ? dateMatch[1].trim() : \"\",\n    total: totalMatch ? totalMatch[1].trim() : \"\"\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        0
+      ],
+      "id": "bebde9e0-f134-4717-9249-3dbac4f527b0",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_DRIVE_FOLDER_ID",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Invoices",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Invoice Number": "={{ $json.invoiceNumber }}",
+            "Client": "={{ $json.client }}",
+            "Date": "={{ $json.date }}",
+            "Total": "={{ $json.total }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Invoice Number",
+              "displayName": "Invoice Number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Client",
+              "displayName": "Client",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total",
+              "displayName": "Total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        624,
+        0
+      ],
+      "id": "3659e93b-7282-42fa-bea2-6cfcadad064a",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "MfhtF2BA7JTJ5Dr4",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Drive Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0270cd44-7ebd-47cf-ac6d-86809ff77f90",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2a934fbbc58eae7606fc741e81d9f7f1929c9bbe5c1ce5c81b715326ad778237"
+  },
+  "nodeGroups": [],
+  "id": "Kgnc2W9vSo8PB3OG",
+  "tags": []
+}
